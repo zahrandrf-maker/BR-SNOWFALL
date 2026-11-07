@@ -45,7 +45,7 @@ jobs:
       - name: Upload plugin
         uses: actions/upload-artifact@v4
         with:
-          name: BR-Snowfall-Windows-v0.1.1-beta
+          name: BR-Snowfall-Windows-v0.1.2-beta
           path: out/*
           if-no-files-found: error
 
