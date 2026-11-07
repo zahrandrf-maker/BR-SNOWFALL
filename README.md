@@ -1,4 +1,4 @@
-# BR Snowfall v0.1.0 Beta
+# BR Snowfall v0.1.1 Beta
 
 GPU-accelerated transparent snowfall source for Resolume Arena/Avenue on Windows.
 
@@ -11,6 +11,8 @@ Credit shown in Resolume: **Effect by Belajar Resolume**
 - Adjustable amount, size, size random, speed, and speed random
 - Wind direction, wind strength, horizontal drift, and rotation
 - Three depth layers
+- Depth of Field with Background, Middle, Foreground, and All Sharp focus modes
+- Adjustable DOF blur amount
 - Snow color, opacity, glow, and softness
 - Low, Medium, and High quality modes
 - Start, Pause, Resume, and Reset controls
@@ -23,7 +25,13 @@ Credit shown in Resolume: **Effect by Belajar Resolume**
 2. Upload **all contents** of this folder, including the `.github` folder.
 3. Open the repository's **Actions** tab.
 4. Open **Build BR Snowfall** and click **Run workflow**.
-5. When the job is green, download artifact `BR-Snowfall-Windows-v0.1.0-beta`.
+5. When the job is green, download artifact `BR-Snowfall-Windows-v0.1.1-beta`.
+
+## v0.1.1 changes
+
+- Crystal snow rebuilt with a more visible six-branch snowflake shape
+- Crystal flakes are larger than round flakes for better readability on LED screens
+- Added Depth of Field controls and selectable focus layer
 
 Do not choose one of GitHub's suggested workflow templates. This package already contains `.github/workflows/build-windows.yml`.
 

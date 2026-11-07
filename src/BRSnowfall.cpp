@@ -23,6 +23,9 @@ enum Param : FFUInt32 {
   P_DRIFT,
   P_ROTATION,
   P_DEPTH,
+  P_DOF_ENABLE,
+  P_FOCUS_LAYER,
+  P_DOF_BLUR,
   P_OPACITY,
   P_HUE,
   P_SATURATION,
@@ -42,7 +45,7 @@ static CFFGLPluginInfo PluginInfo(
   2,
   1,
   0,
-  100,
+  101,
   FF_SOURCE,
   "GPU snowfall source with round and crystal snow",
   "Effect by Belajar Resolume");
@@ -71,6 +74,9 @@ uniform float windStrength;
 uniform float driftAmount;
 uniform float rotationSpeed;
 uniform float depthAmount;
+uniform float dofEnabled;
+uniform float focusLayer;
+uniform float dofBlur;
 uniform float globalOpacity;
 uniform vec3 snowColor;
 uniform float glowAmount;
@@ -107,12 +113,16 @@ float crystalDistance(vec2 p,float angle){
   for(int i=0;i<3;++i){
     float a=float(i)*1.0471975512;
     vec2 axis=vec2(cos(a),sin(a));
-    d=min(d,lineDistance(p,-axis,axis));
+    d=min(d,lineDistance(p,-axis*0.92,axis*0.92));
     vec2 side=vec2(-axis.y,axis.x);
-    d=min(d,lineDistance(p,axis*0.35,axis*0.65+side*0.22));
-    d=min(d,lineDistance(p,axis*0.35,axis*0.65-side*0.22));
-    d=min(d,lineDistance(p,-axis*0.35,-axis*0.65+side*0.22));
-    d=min(d,lineDistance(p,-axis*0.35,-axis*0.65-side*0.22));
+    d=min(d,lineDistance(p,axis*0.30,axis*0.58+side*0.26));
+    d=min(d,lineDistance(p,axis*0.30,axis*0.58-side*0.26));
+    d=min(d,lineDistance(p,axis*0.54,axis*0.78+side*0.18));
+    d=min(d,lineDistance(p,axis*0.54,axis*0.78-side*0.18));
+    d=min(d,lineDistance(p,-axis*0.30,-axis*0.58+side*0.26));
+    d=min(d,lineDistance(p,-axis*0.30,-axis*0.58-side*0.26));
+    d=min(d,lineDistance(p,-axis*0.54,-axis*0.78+side*0.18));
+    d=min(d,lineDistance(p,-axis*0.54,-axis*0.78-side*0.18));
   }
   return d;
 }
@@ -143,23 +153,24 @@ float renderLayer(vec2 scene,float layerIndex){
 
       vec2 p=local-(offset+randomPoint);
       float randomScale=mix(1.0-sizeRandom*0.72,1.0+sizeRandom*0.85,hash11(identity+15.0));
-      float radius=mix(0.055,0.31,snowSize)*randomScale*depth;
+      bool useCrystal=snowType>0.5&&snowType<1.5;
+      if(snowType>1.5)useCrystal=hash11(identity+38.0)>0.58;
+      float radius=mix(0.055,0.31,snowSize)*randomScale*depth*(useCrystal?1.32:1.0);
       vec2 shapePoint=p/max(radius,0.001);
       float roundD=length(shapePoint)-1.0;
       float angle=elapsed*rotationSpeed*mix(-2.5,2.5,hash11(identity+27.0))+identity;
-      float crystalD=crystalDistance(shapePoint,angle)-0.055;
-      float selectedD=roundD;
-      if(snowType>1.5){
-        selectedD=(hash11(identity+38.0)>0.5)?crystalD:roundD;
-      }else if(snowType>0.5){
-        selectedD=crystalD;
-      }
+      float crystalD=crystalDistance(shapePoint,angle)-0.072;
+      float selectedD=useCrystal?crystalD:roundD;
 
-      float edge=mix(0.018,0.22,softness);
+      float focusDistance=0.0;
+      if(focusLayer<2.5)focusDistance=abs(layerIndex-focusLayer)/2.0;
+      float layerBlur=dofEnabled>0.5?focusDistance*dofBlur:0.0;
+      float edge=mix(0.018,0.22,softness)+layerBlur*0.34;
       float flake=1.0-smoothstep(-edge,edge,selectedD);
-      float halo=(1.0-smoothstep(0.0,1.65,length(shapePoint)))*glowAmount*0.42;
+      float blurHalo=(1.0-smoothstep(0.15,2.05+layerBlur*2.5,length(shapePoint)))*layerBlur*0.42;
+      float halo=(1.0-smoothstep(0.0,1.65,length(shapePoint)))*glowAmount*0.42+blurHalo;
       float depthFade=mix(0.52,1.0,depthAmount*layerIndex/2.0+0.2);
-      alpha=max(alpha,(flake+halo)*depthFade);
+      alpha=max(alpha,(flake+halo)*depthFade*mix(1.0,0.68,layerBlur));
     }
   }
   return clamp(alpha,0.0,1.0);
@@ -192,6 +203,9 @@ BRSnowfall::BRSnowfall() : values_(P_COUNT,0.0f) {
   values_[P_DRIFT]=0.35f;
   values_[P_ROTATION]=0.28f;
   values_[P_DEPTH]=0.75f;
+  values_[P_DOF_ENABLE]=0.0f;
+  values_[P_FOCUS_LAYER]=3.0f;
+  values_[P_DOF_BLUR]=0.45f;
   values_[P_OPACITY]=0.92f;
   values_[P_SATURATION]=0.04f;
   values_[P_BRIGHTNESS]=1.0f;
@@ -220,6 +234,13 @@ BRSnowfall::BRSnowfall() : values_(P_COUNT,0.0f) {
   SetParamInfof(P_DRIFT,"Horizontal Drift",FF_TYPE_STANDARD);
   SetParamInfof(P_ROTATION,"Rotation Speed",FF_TYPE_STANDARD);
   SetParamInfof(P_DEPTH,"Depth",FF_TYPE_STANDARD);
+  SetParamInfof(P_DOF_ENABLE,"Depth of Field",FF_TYPE_BOOLEAN);
+  SetOptionParamInfo(P_FOCUS_LAYER,"DOF Focus Layer",4,3);
+  addOption(P_FOCUS_LAYER,0,"Background",0.0f);
+  addOption(P_FOCUS_LAYER,1,"Middle",1.0f);
+  addOption(P_FOCUS_LAYER,2,"Foreground",2.0f);
+  addOption(P_FOCUS_LAYER,3,"All Sharp",3.0f);
+  SetParamInfof(P_DOF_BLUR,"DOF Blur Amount",FF_TYPE_STANDARD);
 
   SetParamInfof(P_OPACITY,"Opacity",FF_TYPE_STANDARD);
   SetParamInfof(P_HUE,"Snow Color",FF_TYPE_HUE);
@@ -238,6 +259,7 @@ BRSnowfall::BRSnowfall() : values_(P_COUNT,0.0f) {
   for(unsigned int i=P_START;i<=P_RESET;++i)SetParamGroup(i,"Playback");
   for(unsigned int i=P_SNOW_TYPE;i<=P_SPEED_RANDOM;++i)SetParamGroup(i,"Snow Setting");
   for(unsigned int i=P_WIND_DIRECTION;i<=P_DEPTH;++i)SetParamGroup(i,"Motion");
+  for(unsigned int i=P_DOF_ENABLE;i<=P_DOF_BLUR;++i)SetParamGroup(i,"Depth of Field");
   for(unsigned int i=P_OPACITY;i<=P_SOFTNESS;++i)SetParamGroup(i,"Appearance");
   for(unsigned int i=P_QUALITY;i<=P_SEED;++i)SetParamGroup(i,"Performance");
   SetParamGroup(P_CREDIT,"Credit");
@@ -281,6 +303,9 @@ FFResult BRSnowfall::ProcessOpenGL(ProcessOpenGLStruct*){
   glUniform1f(uniform("driftAmount"),values_[P_DRIFT]);
   glUniform1f(uniform("rotationSpeed"),values_[P_ROTATION]);
   glUniform1f(uniform("depthAmount"),values_[P_DEPTH]);
+  glUniform1f(uniform("dofEnabled"),values_[P_DOF_ENABLE]);
+  glUniform1f(uniform("focusLayer"),values_[P_FOCUS_LAYER]);
+  glUniform1f(uniform("dofBlur"),values_[P_DOF_BLUR]);
   glUniform1f(uniform("globalOpacity"),values_[P_OPACITY]);
   glUniform3f(uniform("snowColor"),red,green,blue);
   glUniform1f(uniform("glowAmount"),values_[P_GLOW]);
