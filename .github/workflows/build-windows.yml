@@ -39,13 +39,16 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path out | Out-Null
-          Copy-Item "build/plugin/BR Snowfall.dll" "out/BR Snowfall.dll"
-          Copy-Item "README.md" "out/README.txt"
+          New-Item -ItemType Directory -Force -Path package | Out-Null
+          Copy-Item "build/plugin/BR Snowfall.dll" "package/BR Snowfall.dll"
+          Copy-Item "README.md" "package/README.txt"
+          tar -czf "out/BR-Snowfall-Windows-v0.1.3-beta.tar.gz" -C package .
+          if (-not (Test-Path "out/BR-Snowfall-Windows-v0.1.3-beta.tar.gz")) { throw "Nested plugin archive was not produced" }
 
       - name: Upload plugin
         uses: actions/upload-artifact@v4
         with:
-          name: BR-Snowfall-Windows-v0.1.2-beta
-          path: out/*
+          name: BR-Snowfall-Windows-v0.1.3-beta
+          path: out/BR-Snowfall-Windows-v0.1.3-beta.tar.gz
           if-no-files-found: error
 
