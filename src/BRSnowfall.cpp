@@ -49,7 +49,7 @@ static CFFGLPluginInfo PluginInfo(
   2,
   1,
   0,
-  102,
+  103,
   FF_SOURCE,
   "GPU snowfall source with round and crystal snow",
   "Effect by Belajar Resolume");

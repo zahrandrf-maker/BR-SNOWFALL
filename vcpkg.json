@@ -1,6 +1,6 @@
 {
   "name": "br-snowfall",
-  "version-string": "0.1.2",
+  "version-string": "0.1.3",
   "dependencies": ["glew"]
 }
 

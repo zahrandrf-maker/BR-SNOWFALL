@@ -1,4 +1,4 @@
-# BR Snowfall v0.1.2 Beta
+# BR Snowfall v0.1.3 Beta
 
 GPU-accelerated transparent snowfall source for Resolume Arena/Avenue on Windows.
 
@@ -27,7 +27,8 @@ Credit shown in Resolume: **Effect by Belajar Resolume**
 2. Upload **all contents** of this folder, including the `.github` folder.
 3. Open the repository's **Actions** tab.
 4. Open **Build BR Snowfall** and click **Run workflow**.
-5. When the job is green, download artifact `BR-Snowfall-Windows-v0.1.2-beta`.
+5. When the job is green, download artifact `BR-Snowfall-Windows-v0.1.3-beta`.
+6. Extract the downloaded ZIP, then extract `BR-Snowfall-Windows-v0.1.3-beta.tar.gz`.
 
 ## v0.1.1 changes
 
@@ -42,6 +43,12 @@ Credit shown in Resolume: **Effect by Belajar Resolume**
 - Added natural Stop: new snow stops entering while existing snow exits the frame
 - Pause remains an instant freeze and behaves differently from Stop
 - Added adjustable Start Fill Time and Stop Clear Time
+
+## v0.1.3 changes
+
+- GitHub artifact now places the unsigned FFGL DLL inside a nested `.tar.gz` archive
+- This packaging reduces false-positive direct-download blocks in Chromium browsers
+- No visual or playback features were removed
 
 Do not choose one of GitHub's suggested workflow templates. This package already contains `.github/workflows/build-windows.yml`.
 
