@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(BRSnowfall VERSION 0.1.1 LANGUAGES CXX)
+project(BRSnowfall VERSION 0.1.2 LANGUAGES CXX)
 
 if(NOT WIN32)
   message(FATAL_ERROR "BR Snowfall v0.1.0 currently supports Windows only")

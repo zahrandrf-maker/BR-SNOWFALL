@@ -27,7 +27,10 @@ private:
   unsigned int viewportHeight_ = 1080;
   std::chrono::steady_clock::time_point lastFrame_;
   double elapsed_ = 0.0;
+  double stopStartedAt_ = 0.0;
   bool paused_ = false;
+  bool stopping_ = false;
+  bool stopped_ = false;
 
   ffglex::FFGLShader shader_;
   ffglex::FFGLScreenQuad quad_;

@@ -11,13 +11,17 @@ enum Param : FFUInt32 {
   P_START,
   P_PAUSE,
   P_RESUME,
+  P_STOP,
   P_RESET,
+  P_START_FILL_TIME,
+  P_STOP_CLEAR_TIME,
   P_SNOW_TYPE,
   P_AMOUNT,
   P_SIZE,
   P_SIZE_RANDOM,
   P_SPEED,
   P_SPEED_RANDOM,
+  P_FALL_DIRECTION,
   P_WIND_DIRECTION,
   P_WIND_STRENGTH,
   P_DRIFT,
@@ -45,7 +49,7 @@ static CFFGLPluginInfo PluginInfo(
   2,
   1,
   0,
-  101,
+  102,
   FF_SOURCE,
   "GPU snowfall source with round and crystal snow",
   "Effect by Belajar Resolume");
@@ -69,6 +73,7 @@ uniform float snowSize;
 uniform float sizeRandom;
 uniform float fallSpeed;
 uniform float speedRandom;
+uniform float fallDirection;
 uniform float windDirection;
 uniform float windStrength;
 uniform float driftAmount;
@@ -83,6 +88,8 @@ uniform float glowAmount;
 uniform float softness;
 uniform float quality;
 uniform float randomSeed;
+uniform float startProgress;
+uniform float stopProgress;
 in vec2 uv;
 out vec4 fragColor;
 
@@ -127,16 +134,33 @@ float crystalDistance(vec2 p,float angle){
   return d;
 }
 
+vec2 directionVector(float mode){
+  if(mode<0.5)return vec2(0.0,-1.0);
+  if(mode<1.5)return vec2(0.0,1.0);
+  if(mode<2.5)return vec2(-1.0,0.0);
+  if(mode<3.5)return vec2(1.0,0.0);
+  if(mode<4.5)return normalize(vec2(-0.55,-1.0));
+  return normalize(vec2(0.55,-1.0));
+}
+
+float travelPosition(vec2 coordinate,float mode){
+  if(mode<0.5)return 1.0-coordinate.y;
+  if(mode<1.5)return coordinate.y;
+  if(mode<2.5)return 1.0-coordinate.x;
+  if(mode<3.5)return coordinate.x;
+  if(mode<4.5)return clamp((1.0-coordinate.y+1.0-coordinate.x)*0.5,0.0,1.0);
+  return clamp((1.0-coordinate.y+coordinate.x)*0.5,0.0,1.0);
+}
+
 float renderLayer(vec2 scene,float layerIndex){
   float depth=mix(0.62,1.22,layerIndex/2.0);
   float density=mix(4.0,17.0,amount)*depth;
   vec2 grid=scene*density;
   float baseSpeed=mix(0.035,0.48,fallSpeed)*depth;
-  vec2 motion=vec2(
-    windDirection*windStrength*elapsed*0.22*depth,
-    -elapsed*baseSpeed
-  );
-  grid+=motion*density;
+  vec2 direction=directionVector(fallDirection);
+  vec2 motion=direction*elapsed*baseSpeed;
+  motion.x+=windDirection*windStrength*elapsed*0.22*depth;
+  grid-=motion*density;
   vec2 base=floor(grid);
   vec2 local=fract(grid);
   float alpha=0.0;
@@ -182,6 +206,10 @@ void main(){
   float alpha=renderLayer(scene,0.0);
   if(quality>0.25)alpha=max(alpha,renderLayer(scene,1.0));
   if(quality>0.75)alpha=max(alpha,renderLayer(scene,2.0));
+  float travel=travelPosition(uv,fallDirection);
+  float startMask=1.0-smoothstep(startProgress,startProgress+0.035,travel);
+  float stopMask=smoothstep(stopProgress-0.035,stopProgress,travel);
+  alpha*=startMask*stopMask;
   alpha=clamp(alpha*globalOpacity,0.0,1.0);
   fragColor=vec4(snowColor*alpha,alpha);
 }
@@ -193,11 +221,14 @@ BRSnowfall::BRSnowfall() : values_(P_COUNT,0.0f) {
   SetMaxInputs(0);
 
   values_[P_SNOW_TYPE]=2.0f;
+  values_[P_START_FILL_TIME]=0.35f;
+  values_[P_STOP_CLEAR_TIME]=0.35f;
   values_[P_AMOUNT]=0.48f;
   values_[P_SIZE]=0.38f;
   values_[P_SIZE_RANDOM]=0.62f;
   values_[P_SPEED]=0.34f;
   values_[P_SPEED_RANDOM]=0.45f;
+  values_[P_FALL_DIRECTION]=0.0f;
   values_[P_WIND_DIRECTION]=0.5f;
   values_[P_WIND_STRENGTH]=0.12f;
   values_[P_DRIFT]=0.35f;
@@ -217,7 +248,10 @@ BRSnowfall::BRSnowfall() : values_(P_COUNT,0.0f) {
   SetParamInfof(P_START,"Start",FF_TYPE_EVENT);
   SetParamInfof(P_PAUSE,"Pause",FF_TYPE_EVENT);
   SetParamInfof(P_RESUME,"Resume",FF_TYPE_EVENT);
+  SetParamInfof(P_STOP,"Stop - Clear Naturally",FF_TYPE_EVENT);
   SetParamInfof(P_RESET,"Reset",FF_TYPE_EVENT);
+  SetParamInfof(P_START_FILL_TIME,"Start Fill Time",FF_TYPE_STANDARD);
+  SetParamInfof(P_STOP_CLEAR_TIME,"Stop Clear Time",FF_TYPE_STANDARD);
 
   SetOptionParamInfo(P_SNOW_TYPE,"Snow Type",3,2);
   addOption(P_SNOW_TYPE,0,"Round",0.0f);
@@ -228,6 +262,14 @@ BRSnowfall::BRSnowfall() : values_(P_COUNT,0.0f) {
   SetParamInfof(P_SIZE_RANDOM,"Size Random",FF_TYPE_STANDARD);
   SetParamInfof(P_SPEED,"Fall Speed",FF_TYPE_STANDARD);
   SetParamInfof(P_SPEED_RANDOM,"Speed Random",FF_TYPE_STANDARD);
+
+  SetOptionParamInfo(P_FALL_DIRECTION,"Fall Direction",6,0);
+  addOption(P_FALL_DIRECTION,0,"Down",0.0f);
+  addOption(P_FALL_DIRECTION,1,"Up",1.0f);
+  addOption(P_FALL_DIRECTION,2,"Left",2.0f);
+  addOption(P_FALL_DIRECTION,3,"Right",3.0f);
+  addOption(P_FALL_DIRECTION,4,"Down Left",4.0f);
+  addOption(P_FALL_DIRECTION,5,"Down Right",5.0f);
 
   SetParamInfof(P_WIND_DIRECTION,"Wind Direction",FF_TYPE_STANDARD);
   SetParamInfof(P_WIND_STRENGTH,"Wind Strength",FF_TYPE_STANDARD);
@@ -256,9 +298,9 @@ BRSnowfall::BRSnowfall() : values_(P_COUNT,0.0f) {
   SetParamInfof(P_SEED,"Random Seed",FF_TYPE_STANDARD);
   SetParamInfo(P_CREDIT,"Effect by Belajar Resolume",FF_TYPE_TEXT,credit_.c_str());
 
-  for(unsigned int i=P_START;i<=P_RESET;++i)SetParamGroup(i,"Playback");
+  for(unsigned int i=P_START;i<=P_STOP_CLEAR_TIME;++i)SetParamGroup(i,"Playback");
   for(unsigned int i=P_SNOW_TYPE;i<=P_SPEED_RANDOM;++i)SetParamGroup(i,"Snow Setting");
-  for(unsigned int i=P_WIND_DIRECTION;i<=P_DEPTH;++i)SetParamGroup(i,"Motion");
+  for(unsigned int i=P_FALL_DIRECTION;i<=P_DEPTH;++i)SetParamGroup(i,"Motion");
   for(unsigned int i=P_DOF_ENABLE;i<=P_DOF_BLUR;++i)SetParamGroup(i,"Depth of Field");
   for(unsigned int i=P_OPACITY;i<=P_SOFTNESS;++i)SetParamGroup(i,"Appearance");
   for(unsigned int i=P_QUALITY;i<=P_SEED;++i)SetParamGroup(i,"Performance");
@@ -285,6 +327,15 @@ FFResult BRSnowfall::ProcessOpenGL(ProcessOpenGLStruct*){
   lastFrame_=now;
   if(!paused_)elapsed_+=std::min(delta,0.1);
 
+  const float startDuration=0.25f+values_[P_START_FILL_TIME]*7.75f;
+  const float stopDuration=0.25f+values_[P_STOP_CLEAR_TIME]*7.75f;
+  const float startProgress=stopped_?0.0f:std::min(1.0f,float(elapsed_/startDuration));
+  float stopProgress=0.0f;
+  if(stopping_){
+    stopProgress=std::min(1.0f,float((elapsed_-stopStartedAt_)/stopDuration));
+    if(stopProgress>=1.0f){stopping_=false;stopped_=true;}
+  }else if(stopped_)stopProgress=1.0f;
+
   float red=1.0f,green=1.0f,blue=1.0f;
   HSVtoRGB(values_[P_HUE],values_[P_SATURATION],values_[P_BRIGHTNESS],red,green,blue);
 
@@ -298,6 +349,7 @@ FFResult BRSnowfall::ProcessOpenGL(ProcessOpenGLStruct*){
   glUniform1f(uniform("sizeRandom"),values_[P_SIZE_RANDOM]);
   glUniform1f(uniform("fallSpeed"),values_[P_SPEED]);
   glUniform1f(uniform("speedRandom"),values_[P_SPEED_RANDOM]);
+  glUniform1f(uniform("fallDirection"),values_[P_FALL_DIRECTION]);
   glUniform1f(uniform("windDirection"),(values_[P_WIND_DIRECTION]-0.5f)*2.0f);
   glUniform1f(uniform("windStrength"),values_[P_WIND_STRENGTH]);
   glUniform1f(uniform("driftAmount"),values_[P_DRIFT]);
@@ -312,6 +364,8 @@ FFResult BRSnowfall::ProcessOpenGL(ProcessOpenGLStruct*){
   glUniform1f(uniform("softness"),values_[P_SOFTNESS]);
   glUniform1f(uniform("quality"),values_[P_QUALITY]);
   glUniform1f(uniform("randomSeed"),values_[P_SEED]);
+  glUniform1f(uniform("startProgress"),startProgress);
+  glUniform1f(uniform("stopProgress"),stopProgress);
 
   glEnable(GL_BLEND);
   glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
@@ -329,10 +383,11 @@ FFResult BRSnowfall::DeInitGL(){
 FFResult BRSnowfall::SetFloatParameter(unsigned int index,float value){
   if(index>=P_COUNT)return FF_FAIL;
   values_[index]=value;
-  if(index==P_START&&value!=0.0f){elapsed_=0.0;paused_=false;lastFrame_=std::chrono::steady_clock::now();}
+  if(index==P_START&&value!=0.0f){elapsed_=0.0;paused_=false;stopping_=false;stopped_=false;lastFrame_=std::chrono::steady_clock::now();}
   if(index==P_PAUSE&&value!=0.0f)paused_=true;
-  if(index==P_RESUME&&value!=0.0f){paused_=false;lastFrame_=std::chrono::steady_clock::now();}
-  if(index==P_RESET&&value!=0.0f){elapsed_=0.0;lastFrame_=std::chrono::steady_clock::now();}
+  if(index==P_RESUME&&value!=0.0f&&!stopped_){paused_=false;lastFrame_=std::chrono::steady_clock::now();}
+  if(index==P_STOP&&value!=0.0f&&!stopped_&&!stopping_){paused_=false;stopping_=true;stopStartedAt_=elapsed_;lastFrame_=std::chrono::steady_clock::now();}
+  if(index==P_RESET&&value!=0.0f){elapsed_=0.0;paused_=false;stopping_=false;stopped_=false;lastFrame_=std::chrono::steady_clock::now();}
   return FF_SUCCESS;
 }
 
